@@ -196,7 +196,7 @@ def main(src, out, per=2, seed=20260820):
                 "review_date": stamp,
                 "reviewer_name": name,
                 "reviewer_email": "%s-%d@example.invalid" % (p["handle"][:24], i + 1),
-                "product_id": "",
+                "product_id": p["id"],
                 "product_handle": p["handle"],
                 "reply": "",
                 "picture_urls": "",
