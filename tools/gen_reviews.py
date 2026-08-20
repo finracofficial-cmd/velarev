@@ -25,7 +25,7 @@ FEATURE_LINE = {
  "レース":"レースの繊細さが写真以上でした","フリル":"フリルのボリュームがちょうど良いです","リボン":"リボンの位置が可愛くて気に入りました",
  "花柄":"花柄が派手すぎず上品でした","フローラル":"花柄が派手すぎず上品でした","ドット":"ドット柄の大きさがちょうど良いです",
  "チェック":"チェック柄の色合いが落ち着いていました","ストライプ":"ストライプの幅がちょうど良いです",
- "デニム":"デニムの色落ち加減が good でした","サテン":"サテンの光沢が上品でチープに見えません",
+ "デニム":"デニムの色落ち加減がちょうど良かったです","サテン":"サテンの光沢が上品でチープに見えません",
  "ニット":"編み地がしっかりしていて安っぽくありません","透け":"透け感は控えめでインナー次第で調整できます",
  "シアー":"シアー感が上品で着やすいです","パフスリーブ":"パフスリーブのふくらみが可愛いです",
  "オフショル":"肩の出方がちょうど良いバランスでした","ギャザー":"ギャザーの寄せ方がきれいです",
@@ -92,13 +92,27 @@ def parse_size_chart(body_html):
 
 GARMENT = r"(Dress|Coat|Vest|Top|Jacket|Skirt|Pants|Shirt|Set|Suit|Cardigan|Bottom|ワンピース|コート|ベスト|トップス|ジャケット|スカート|パンツ|シャツ|セット|上|下)"
 
+COLOR_JA = {
+    "white":"ホワイト","black":"ブラック","green":"グリーン","red":"レッド","brown":"ブラウン",
+    "blue":"ブルー","gray":"グレー","grey":"グレー","apricot":"アプリコット","pink":"ピンク",
+    "dark blue":"ダークブルー","khaki":"カーキ","beige":"ベージュ","coffee":"コーヒーブラウン",
+    "burgundy":"バーガンディ","light yellow":"ライトイエロー","quiet black":"ブラック",
+    "purple":"パープル","light gray":"ライトグレー","blue green":"ブルーグリーン",
+    "dark brown":"ダークブラウン","navy":"ネイビー","coral pink":"コーラルピンク",
+    "yellow":"イエロー","orange":"オレンジ","ivory":"アイボリー","mint":"ミント",
+    "wine red":"ワインレッド","light blue":"ライトブルー","dark green":"ダークグリーン",
+}
+NOT_COLOR = {"free","f","one size","onesize","default"}
+
 def clean_color(c):
     """バリエーション名から衣類名を除き、色名として使えるものだけ返す。"""
     c = re.sub(r"[（(].*?[)）]", "", c).strip()
     c = re.sub(r"\s*" + GARMENT + r"\s*$", "", c, flags=re.I).strip()
     c = re.sub(r"^\s*" + GARMENT + r"\s*", "", c, flags=re.I).strip()
-    if not c or len(c) > 12 or re.search(GARMENT, c, re.I): return None
-    return c
+    if not c or len(c) > 14 or re.search(GARMENT, c, re.I): return None
+    key = c.lower().strip()
+    if key in NOT_COLOR: return None
+    return COLOR_JA.get(key, c)
 
 def variant_axes(variants):
     colors, sizes = [], []
@@ -173,17 +187,31 @@ def main(src, out, per=2, seed=20260820):
                 name, title, body = build(p, i, rng, cat, chart, colors, sizes, feats, fits, used_titles, used_open)
                 if name not in used_names: break
             used_names.add(name)
-            rows.append({"product_handle": p["handle"], "reviewer_name": name,
+            d = start + timedelta(days=rng.randrange(span))
+            stamp = "%s %02d:%02d:%02d UTC" % (d.isoformat(), rng.randrange(24), rng.randrange(60), rng.randrange(60))
+            rows.append({
+                "title": title,
+                "body": body,
+                "rating": 5,
+                "review_date": stamp,
+                "reviewer_name": name,
                 "reviewer_email": "%s-%d@example.invalid" % (p["handle"][:24], i + 1),
-                "review_title": title, "review_body": body, "rating": 5,
-                "review_date": (start + timedelta(days=rng.randrange(span))).isoformat(),
-                "verified_buyer": "true",
-                "product_url": "https://vela-vela.com/products/%s" % p["handle"]})
-    with open(out, "w", newline="", encoding="utf-8-sig") as f:
-        f.write("# 注意: このCSVの全レビューは架空のテストデータです。実在の購入者・実注文には基づきません。\n")
-        f.write("# verified_buyer=true も実際の購入実績に基づくものではありません。\n")
-        f.write("# パスワード保護されたストアでの表示確認専用。保護を解除する場合は事前に全件削除してください。\n")
-        w = csv.DictWriter(f, fieldnames=list(rows[0].keys())); w.writeheader(); w.writerows(rows)
+                "product_id": "",
+                "product_handle": p["handle"],
+                "reply": "",
+                "picture_urls": "",
+            })
+    # Judge.me の direct import はコメント行を解釈しないため、CSV本体には注記を入れない。
+    # 注記は同名の .NOTICE.txt に出す。
+    cols = ["title","body","rating","review_date","reviewer_name","reviewer_email",
+            "product_id","product_handle","reply","picture_urls"]
+    with open(out, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=cols); w.writeheader(); w.writerows(rows)
+    with open(out + ".NOTICE.txt", "w", encoding="utf-8") as f:
+        f.write("このCSVのレビューは全て架空のテストデータです。\n"
+                "実在の購入者・実注文には基づきません。\n\n"
+                "パスワード保護されたストアでの表示確認専用です。\n"
+                "保護を解除する場合は、解除前に Judge.me から全件削除してください。\n")
     print("products=%d reviews=%d -> %s" % (len(prods), len(rows), out))
 
 if __name__ == "__main__":
