@@ -128,13 +128,11 @@ def rewrite(src, dst):
 def post(csv_path, live=False):
     """レビューを API から直接投稿する。"""
     need_env()
-    cache = load_cache()
-    if not cache:
-        sys.exit("先に resolve を実行してください")
+    # 投稿は platform=shopify + Shopify 商品ID で紐づく。内部IDは使わないので
+    # resolve は不要（内部IDが要るのはウィザード用CSVを作る rewrite のときだけ）。
     rows = list(csv.DictReader(open(csv_path, encoding="utf-8")))
-    targets = [(r, cache.get(r.get("product_id", ""))) for r in rows]
-    ready = [(r, pid) for r, pid in targets if pid]
-    print("投稿対象 %d 件 / 内部ID未解決のため除外 %d 件" % (len(ready), len(targets) - len(ready)))
+    ready = [(r, r["product_id"]) for r in rows if r.get("product_id")]
+    print("投稿対象 %d 件 / 商品ID欠落のため除外 %d 件" % (len(ready), len(rows) - len(ready)))
     if not live:
         print("これは確認のみです。実際に投稿するには --live を付けてください。")
         for r, pid in ready[:3]:
@@ -150,7 +148,11 @@ def post(csv_path, live=False):
         if key in done:
             continue
         # API が受け付けるのは name / email。reviewer_name, reviewer_email では 422 になる。
+        # 商品への紐付けは platform と id（Shopify 商品ID）の組。external_id /
+        # product_external_id / product_handle はいずれも 201 を返すが
+        # product_external_id=0 の未紐付けレビューになる。
         form = {
+            "platform": "shopify",
             "id": pid,
             "name": r["reviewer_name"],
             "email": r["reviewer_email"],
