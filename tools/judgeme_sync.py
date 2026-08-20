@@ -149,14 +149,18 @@ def post(csv_path, live=False):
         key = "%s:%s" % (pid, r["reviewer_email"])
         if key in done:
             continue
-        call("POST", "/reviews", form={
+        # API が受け付けるのは name / email。reviewer_name, reviewer_email では 422 になる。
+        form = {
             "id": pid,
-            "reviewer_name": r["reviewer_name"],
-            "reviewer_email": r["reviewer_email"],
+            "name": r["reviewer_name"],
+            "email": r["reviewer_email"],
             "rating": r["rating"],
             "title": r["title"],
             "body": r["body"],
-        })
+        }
+        if r.get("review_date"):
+            form["created_at"] = r["review_date"]
+        call("POST", "/reviews", form=form)
         log.write(key + "\n")
         log.flush()
         sent += 1
