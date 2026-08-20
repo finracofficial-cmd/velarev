@@ -473,7 +473,7 @@ def pick_name(rng):
     return name
 
 
-def main(src, out, per=2, seed=20260820):
+def main(src, out, per=2, seed=20260820, run_tag="b"):
     prods = json.load(open(src))
     start = date(2026, 3, 1)
     span = (date(2026, 8, 10) - start).days
@@ -513,7 +513,10 @@ def main(src, out, per=2, seed=20260820):
                 "review_date": "%s %02d:%02d:%02d UTC" % (d.isoformat(), rng.randrange(24),
                                                           rng.randrange(60), rng.randrange(60)),
                 "reviewer_name": name,
-                "reviewer_email": "%s-%d@example.invalid" % (p["handle"][:24], i + 1),
+                # ハンドルは先頭が同じ商品同士でぶつかるため、一意な商品IDで作る。
+                # run_tag は、投入をやり直すときに前回と同じ email が
+                # Judge.me 側で重複扱いされるのを避けるためのもの。
+                "reviewer_email": "p%s-%s%d@example.invalid" % (p["id"], run_tag, i + 1),
                 "product_id": p["id"],
                 "product_handle": p["handle"],
                 "reply": "",
